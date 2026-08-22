@@ -172,8 +172,8 @@ def patch_speedtest_service(root_dir):
                     if (node?.ConfigType == EConfigType.Custom)
                     {
                         it.Port = node.Port > 0 ? node.Port : (node.PreSocksPort ?? 10809);
-                        var delay = await DoRealPing(it);
-                        if (blSpeedTest && delay > 0)
+                        var customDelay = await DoRealPing(it);
+                        if (blSpeedTest && customDelay > 0)
                         {
                             if (ShouldStopTest(exitLoopKey))
                             {
