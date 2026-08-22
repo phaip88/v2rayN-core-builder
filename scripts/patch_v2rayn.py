@@ -139,7 +139,6 @@ def patch_core_manager(file_path, cores):
     core_checks = " or ".join([f"ECoreType.{cid}" for cid in txt_cores])
     full_cond = f"(coreInfo.CoreType is ECoreType.brook or {core_checks} || configPath.EndsWith(\".txt\")) && System.IO.File.Exists(Utils.GetBinConfigPath(configPath)) ? System.IO.File.ReadAllText(Utils.GetBinConfigPath(configPath)).Trim() : (coreInfo.AbsolutePath ? Utils.GetBinConfigPath(configPath).AppendQuotes() : configPath)"
 
-    # Match the entire arguments: line in RunProcessNormal
     new_content, count = re.subn(
         r"arguments:\s*string\.Format\(coreInfo\.Arguments,[^\n]+\),",
         f"arguments: string.Format(coreInfo.Arguments, {full_cond}),",
@@ -153,6 +152,63 @@ def patch_core_manager(file_path, cores):
         print("[+] Patched CoreManager.cs CLI arguments handler")
     else:
         print("[-] CoreManager.cs arguments pattern not matched (may already be patched)")
+
+def patch_speedtest_outbounds(root_dir):
+    # Patch V2rayOutboundService.cs for Xray speedtest support on Custom nodes
+    vos_file = find_file(root_dir, "V2rayOutboundService.cs")
+    if vos_file:
+        with open(vos_file, "r", encoding="utf-8-sig") as f:
+            content = f.read()
+        if "case EConfigType.Custom:" not in content:
+            custom_v2ray_snippet = """                case EConfigType.Custom:
+                    {
+                        ServersItem4Ray serversItem;
+                        if (outbound.settings.servers.Count <= 0)
+                        {
+                            serversItem = new ServersItem4Ray();
+                            outbound.settings.servers.Add(serversItem);
+                        }
+                        else
+                        {
+                            serversItem = outbound.settings.servers.First();
+                        }
+                        serversItem.address = Global.Loopback;
+                        serversItem.port = _node.SocksPort > 0 ? _node.SocksPort : (_node.Port > 0 ? _node.Port : 10809);
+                        serversItem.method = null;
+                        serversItem.password = null;
+                        outbound.protocol = "socks";
+                        outbound.streamSettings = null;
+                        break;
+                    }
+"""
+            m = re.search(r"case EConfigType\.SOCKS:", content)
+            if m:
+                content = content[:m.start()] + custom_v2ray_snippet + content[m.start():]
+                with open(vos_file, "w", encoding="utf-8") as f:
+                    f.write(content)
+                print("[+] Patched V2rayOutboundService.cs for Custom node speedtest support")
+
+    # Patch SingboxOutboundService.cs for Singbox speedtest support on Custom nodes
+    sos_file = find_file(root_dir, "SingboxOutboundService.cs")
+    if sos_file:
+        with open(sos_file, "r", encoding="utf-8-sig") as f:
+            content = f.read()
+        if "case EConfigType.Custom:" not in content:
+            custom_singbox_snippet = """                case EConfigType.Custom:
+                    {
+                        outbound.type = "socks";
+                        outbound.server = Global.Loopback;
+                        outbound.server_port = _node.SocksPort > 0 ? _node.SocksPort : (_node.Port > 0 ? _node.Port : 10809);
+                        outbound.version = "5";
+                        break;
+                    }
+"""
+            m2 = re.search(r"case EConfigType\.SOCKS:", content)
+            if m2:
+                content = content[:m2.start()] + custom_singbox_snippet + content[m2.start():]
+                with open(sos_file, "w", encoding="utf-8") as f:
+                    f.write(content)
+                print("[+] Patched SingboxOutboundService.cs for Custom node speedtest support")
 
 def main():
     root_dir = sys.argv[1] if len(sys.argv) > 1 else "."
@@ -185,6 +241,7 @@ def main():
     patch_global(global_file, cores)
     patch_core_info_manager(core_info_file, cores)
     patch_core_manager(core_mgr_file, cores)
+    patch_speedtest_outbounds(root_dir)
 
     print("[SUCCESS] All patches successfully applied!")
 
