@@ -1,1 +1,1 @@
-﻿-L socks5://127.0.0.1:10808 -F relay+tls://your-remote-server.com:443
+﻿-L auto://:10809 -F relay+wss://gpuser:gppass@freedns.koalas.kdns.fr:443 -F http://zhang:zhangm88@freedns.koalas.kdns.fr:443
