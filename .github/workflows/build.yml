@@ -12,6 +12,11 @@ on:
         type: boolean
         required: true
         default: true
+      self_contained:
+        description: "Self-contained build (embed .NET 8 Runtime, zero dependencies)"
+        type: boolean
+        required: true
+        default: true
   push:
     branches:
       - main
@@ -75,13 +80,14 @@ jobs:
           }
           dotnet build $csproj.FullName -c Release -o ./dist/ServiceLib
 
-      - name: Build Full v2rayN App (Optional)
+      - name: Build Full v2rayN App (Self-Contained with UI)
         if: ${{ github.event_name == 'push' || github.event.inputs.build_full_app == 'true' }}
         shell: pwsh
         run: |
           $v2raynCsproj = Get-ChildItem -Path "./v2rayN-upstream" -Filter "v2rayN.csproj" -Recurse | Where-Object { $_.DirectoryName -notlike "*Desktop*" } | Select-Object -First 1
           if ($v2raynCsproj) {
-            dotnet publish $v2raynCsproj.FullName -c Release -r win-x64 --self-contained false -o ./dist/v2rayN-Extended
+            # Self-contained build includes the .NET 8 Desktop Runtime inside the package
+            dotnet publish $v2raynCsproj.FullName -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o ./dist/v2rayN-Extended
           }
 
       - name: Package Artifacts
@@ -96,7 +102,7 @@ jobs:
           # Include templates in full package
           if (Test-Path "./dist/v2rayN-Extended") {
             Copy-Item -Recurse -Path "./templates" -Destination "./dist/v2rayN-Extended/custom_templates" -Force
-            Compress-Archive -Path "./dist/v2rayN-Extended/*" -DestinationPath "./artifacts/v2rayN-Extended-win64-$tag.zip" -Force
+            Compress-Archive -Path "./dist/v2rayN-Extended/*" -DestinationPath "./artifacts/v2rayN-Extended-win64-SelfContained-$tag.zip" -Force
           }
 
       - name: Upload Build Artifacts
@@ -122,8 +128,8 @@ jobs:
             - **OpenSSH Dynamic SOCKS (`ssh`)**
             
             ### 资产说明
-            1. **`ServiceLib-${{ steps.get_version.outputs.tag }}.zip`**：仅包含 `ServiceLib.dll` 补丁，覆盖现有客户端。
-            2. **`v2rayN-Extended-win64-${{ steps.get_version.outputs.tag }}.zip`**：开箱即用完整版客户端，内置配置模板。
+            1. **`ServiceLib-${{ steps.get_version.outputs.tag }}.zip`**：轻量类库补丁，覆盖现有客户端。
+            2. **`v2rayN-Extended-win64-SelfContained-${{ steps.get_version.outputs.tag }}.zip`**：内置 .NET 8 运行时的完整图形界面客户端，免装任何运行库，开箱即用。
           files: ./artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
