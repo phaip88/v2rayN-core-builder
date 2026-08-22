@@ -1,6 +1,6 @@
 ﻿#!/usr/bin/env python3
 """
-patch_v2rayn.py - Automated patcher for extending v2rayN with custom core support.
+patch_v2rayn.py - Automated patcher for extending v2rayN with custom core support and native Custom node speedtest.
 """
 
 import os
@@ -153,62 +153,60 @@ def patch_core_manager(file_path, cores):
     else:
         print("[-] CoreManager.cs arguments pattern not matched (may already be patched)")
 
-def patch_speedtest_outbounds(root_dir):
-    # Patch V2rayOutboundService.cs for Xray speedtest support on Custom nodes
-    vos_file = find_file(root_dir, "V2rayOutboundService.cs")
-    if vos_file:
-        with open(vos_file, "r", encoding="utf-8-sig") as f:
-            content = f.read()
-        if "case EConfigType.Custom:" not in content:
-            custom_v2ray_snippet = """                case EConfigType.Custom:
-                    {
-                        ServersItem4Ray serversItem;
-                        if (outbound.settings.servers.Count <= 0)
-                        {
-                            serversItem = new ServersItem4Ray();
-                            outbound.settings.servers.Add(serversItem);
-                        }
-                        else
-                        {
-                            serversItem = outbound.settings.servers.First();
-                        }
-                        serversItem.address = Global.Loopback;
-                        serversItem.port = _node.Port > 0 ? _node.Port : (_node.PreSocksPort ?? 10809);
-                        serversItem.method = null;
-                        serversItem.password = null;
-                        outbound.protocol = "socks";
-                        outbound.streamSettings = null;
-                        break;
-                    }
-"""
-            m = re.search(r"case EConfigType\.SOCKS:", content)
-            if m:
-                content = content[:m.start()] + custom_v2ray_snippet + content[m.start():]
-                with open(vos_file, "w", encoding="utf-8") as f:
-                    f.write(content)
-                print("[+] Patched V2rayOutboundService.cs for Custom node speedtest support")
+def patch_speedtest_service(root_dir):
+    st_file = find_file(root_dir, "SpeedtestService.cs")
+    if not st_file:
+        print("[!] SpeedtestService.cs not found")
+        return
 
-    # Patch SingboxOutboundService.cs for Singbox speedtest support on Custom nodes
-    sos_file = find_file(root_dir, "SingboxOutboundService.cs")
-    if sos_file:
-        with open(sos_file, "r", encoding="utf-8-sig") as f:
-            content = f.read()
-        if "case EConfigType.Custom:" not in content:
-            custom_singbox_snippet = """                case EConfigType.Custom:
+    with open(st_file, "r", encoding="utf-8-sig") as f:
+        content = f.read()
+
+    modified = False
+
+    # 1. Bypass subprocess spawn for Custom nodes in RunMixedTestAsync
+    pattern_run = r"(tasks\.Add\(Task\.Run\(async \(\) =>\s*\{\s*ProcessService processService = null;\s*try\s*\{)"
+    match_run = re.search(pattern_run, content)
+    if match_run and "if (node?.ConfigType == EConfigType.Custom)" not in content:
+        custom_bypass = """                    var node = await AppManager.Instance.GetProfileItem(it.IndexId);
+                    if (node?.ConfigType == EConfigType.Custom)
                     {
-                        outbound.type = "socks";
-                        outbound.server = Global.Loopback;
-                        outbound.server_port = _node.Port > 0 ? _node.Port : (_node.PreSocksPort ?? 10809);
-                        outbound.version = "5";
-                        break;
+                        it.Port = node.Port > 0 ? node.Port : (node.PreSocksPort ?? 10809);
+                        var delay = await DoRealPing(it);
+                        if (blSpeedTest && delay > 0)
+                        {
+                            if (ShouldStopTest(exitLoopKey))
+                            {
+                                await UpdateFunc(it.IndexId, "", ResUI.SpeedtestingSkip);
+                                return;
+                            }
+                            await DoSpeedTest(downloadHandle, it);
+                        }
+                        return;
                     }
 """
-            m2 = re.search(r"case EConfigType\.SOCKS:", content)
-            if m2:
-                content = content[:m2.start()] + custom_singbox_snippet + content[m2.start():]
-                with open(sos_file, "w", encoding="utf-8") as f:
-                    f.write(content)
-                print("[+] Patched SingboxOutboundService.cs for Custom node speedtest support")
+        content = content[:match_run.end()] + "\n" + custom_bypass + content[match_run.end():]
+        modified = True
+        print("[+] Patched SpeedtestService.cs RunMixedTestAsync for Custom nodes")
+
+    # 2. Add HTTP/SOCKS auto fallback to DoRealPing
+    pattern_rp = r"var webProxy = new WebProxy\(\$\"socks5://\{Global\.Loopback\}:\{it\.Port\}\"\);\s*var responseTime = await ConnectionHandler\.GetRealPingTime\(webProxy\);"
+    match_rp = re.search(pattern_rp, content)
+    if match_rp:
+        replacement_rp = """var webProxy = new WebProxy($"http://{Global.Loopback}:{it.Port}");
+        var responseTime = await ConnectionHandler.GetRealPingTime(webProxy);
+        if (responseTime <= 0)
+        {
+            webProxy = new WebProxy($"socks5://{Global.Loopback}:{it.Port}");
+            responseTime = await ConnectionHandler.GetRealPingTime(webProxy);
+        }"""
+        content = content[:match_rp.start()] + replacement_rp + content[match_rp.end():]
+        modified = True
+        print("[+] Patched SpeedtestService.cs DoRealPing with HTTP/SOCKS dual support")
+
+    if modified:
+        with open(st_file, "w", encoding="utf-8") as f:
+            f.write(content)
 
 def main():
     root_dir = sys.argv[1] if len(sys.argv) > 1 else "."
@@ -241,7 +239,7 @@ def main():
     patch_global(global_file, cores)
     patch_core_info_manager(core_info_file, cores)
     patch_core_manager(core_mgr_file, cores)
-    patch_speedtest_outbounds(root_dir)
+    patch_speedtest_service(root_dir)
 
     print("[SUCCESS] All patches successfully applied!")
 
