@@ -1,0 +1,129 @@
+﻿name: Build v2rayN with Extended Cores
+
+on:
+  workflow_dispatch:
+    inputs:
+      v2rayn_version:
+        description: "v2rayN Target Version / Tag (e.g. 7.24.4, 7.14.12, or latest)"
+        required: true
+        default: "latest"
+      build_full_app:
+        description: "Build full v2rayN-Extended package in addition to ServiceLib.dll"
+        type: boolean
+        required: true
+        default: true
+  push:
+    branches:
+      - main
+    paths:
+      - "cores.json"
+      - "scripts/**"
+      - ".github/workflows/build.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Determine Target v2rayN Version
+        id: get_version
+        shell: pwsh
+        run: |
+          $reqVer = "${{ github.event.inputs.v2rayn_version }}"
+          if ([string]::IsNullOrWhiteSpace($reqVer) -or $reqVer -eq "latest") {
+            $latest = Invoke-RestMethod -Uri "https://api.github.com/repos/2dust/v2rayN/releases/latest"
+            $tag = $latest.tag_name
+          } else {
+            $tag = $reqVer
+          }
+          Write-Host "Target Tag: $tag"
+          echo "tag=$tag" >> $env:GITHUB_OUTPUT
+
+      - name: Clone Upstream v2rayN
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.get_version.outputs.tag }}"
+          git clone --depth 1 --branch $tag https://github.com/2dust/v2rayN.git v2rayN-upstream
+
+      - name: Apply Custom Core Patches
+        run: |
+          python scripts/patch_v2rayn.py ./v2rayN-upstream cores.json
+
+      - name: Build ServiceLib.dll
+        shell: pwsh
+        run: |
+          $csproj = Get-ChildItem -Path "./v2rayN-upstream" -Filter "ServiceLib.csproj" -Recurse | Select-Object -First 1
+          if (-not $csproj) {
+            Write-Error "ServiceLib.csproj not found!"
+            exit 1
+          }
+          dotnet build $csproj.FullName -c Release -o ./dist/ServiceLib
+
+      - name: Build Full v2rayN App (Optional)
+        if: ${{ github.event_name == 'push' || github.event.inputs.build_full_app == 'true' }}
+        shell: pwsh
+        run: |
+          $v2raynCsproj = Get-ChildItem -Path "./v2rayN-upstream" -Filter "v2rayN.csproj" -Recurse | Where-Object { $_.DirectoryName -notlike "*Desktop*" } | Select-Object -First 1
+          if ($v2raynCsproj) {
+            dotnet publish $v2raynCsproj.FullName -c Release -r win-x64 --self-contained false -o ./dist/v2rayN-Extended
+          }
+
+      - name: Package Artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path "./artifacts" -Force
+          $tag = "${{ steps.get_version.outputs.tag }}"
+          
+          # Compress ServiceLib patch package
+          Compress-Archive -Path "./dist/ServiceLib/*" -DestinationPath "./artifacts/ServiceLib-$tag.zip" -Force
+          
+          # Include templates in full package
+          if (Test-Path "./dist/v2rayN-Extended") {
+            Copy-Item -Recurse -Path "./templates" -Destination "./dist/v2rayN-Extended/custom_templates" -Force
+            Compress-Archive -Path "./dist/v2rayN-Extended/*" -DestinationPath "./artifacts/v2rayN-Extended-win64-$tag.zip" -Force
+          }
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2rayN-Extended-Builds-${{ steps.get_version.outputs.tag }}
+          path: ./artifacts/*
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.get_version.outputs.tag }}-extended
+          name: "v2rayN Extended ${{ steps.get_version.outputs.tag }}"
+          body: |
+            ## v2rayN Extended Release (${{ steps.get_version.outputs.tag }})
+            
+            基于官方 `2dust/v2rayN` **${{ steps.get_version.outputs.tag }}** 编译，包含扩展内核支持：
+            - **Cloudflare Tunnel (`cloudflared`)**
+            - **EasyTier P2P Mesh (`easytier`)**
+            - **GOST Multi-protocol Tunnel (`gost`)**
+            - **Chisel Tunnel (`chisel`)**
+            - **OpenSSH Dynamic SOCKS (`ssh`)**
+            
+            ### 资产说明
+            1. **`ServiceLib-${{ steps.get_version.outputs.tag }}.zip`**：仅包含 `ServiceLib.dll` 补丁，覆盖现有客户端。
+            2. **`v2rayN-Extended-win64-${{ steps.get_version.outputs.tag }}.zip`**：开箱即用完整版客户端，内置配置模板。
+          files: ./artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

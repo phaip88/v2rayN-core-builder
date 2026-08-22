@@ -1,0 +1,1 @@
+﻿-L socks5://127.0.0.1:10808 -F relay+tls://your-remote-server.com:443

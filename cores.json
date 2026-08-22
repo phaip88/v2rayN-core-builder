@@ -1,0 +1,77 @@
+﻿[
+  {
+    "id": "easytier",
+    "name": "EasyTier",
+    "enumValue": 35,
+    "repo": "EasyTier/EasyTier",
+    "exes": [
+      "easytier-core_windows_amd64",
+      "easytier-core_linux_amd64",
+      "easytier-core"
+    ],
+    "arguments": " {0}",
+    "isTxtConfig": true,
+    "absolutePath": true,
+    "description": "EasyTier decentralized P2P mesh VPN"
+  },
+  {
+    "id": "cloudflared",
+    "name": "Cloudflare Tunnel",
+    "enumValue": 36,
+    "repo": "cloudflare/cloudflared",
+    "exes": [
+      "cloudflared_windows_amd64",
+      "cloudflared_linux_amd64",
+      "cloudflared"
+    ],
+    "arguments": " {0}",
+    "isTxtConfig": true,
+    "absolutePath": true,
+    "description": "Cloudflare Tunnel CLI client for TCP/SOCKS proxy"
+  },
+  {
+    "id": "gost",
+    "name": "GOST",
+    "enumValue": 37,
+    "repo": "go-gost/gost",
+    "exes": [
+      "gost_windows_amd64",
+      "gost_linux_amd64",
+      "gost"
+    ],
+    "arguments": " {0}",
+    "isTxtConfig": true,
+    "absolutePath": true,
+    "description": "GO Simple Tunnel - multi-protocol tunnel & proxy"
+  },
+  {
+    "id": "chisel",
+    "name": "Chisel",
+    "enumValue": 38,
+    "repo": "jpillora/chisel",
+    "exes": [
+      "chisel_windows_amd64",
+      "chisel_linux_amd64",
+      "chisel"
+    ],
+    "arguments": " {0}",
+    "isTxtConfig": true,
+    "absolutePath": true,
+    "description": "Fast TCP/UDP tunnel over HTTP"
+  },
+  {
+    "id": "ssh",
+    "name": "OpenSSH",
+    "enumValue": 39,
+    "repo": "PowerShell/Win32-OpenSSH",
+    "exes": [
+      "ssh_windows_amd64",
+      "ssh_linux_amd64",
+      "ssh"
+    ],
+    "arguments": " {0}",
+    "isTxtConfig": true,
+    "absolutePath": true,
+    "description": "SSH dynamic SOCKS forwarding client"
+  }
+]
