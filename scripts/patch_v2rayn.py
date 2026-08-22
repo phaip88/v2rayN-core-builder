@@ -87,7 +87,20 @@ def patch_core_info_manager(file_path, cores):
     with open(file_path, "r", encoding="utf-8-sig") as f:
         content = f.read()
 
-    modified = False
+    init_match = re.search(r"_coreInfo\s*=\s*(\[|new)", content)
+    if not init_match:
+        print("[!] Could not find _coreInfo initialization in CoreInfoManager.cs")
+        return
+
+    init_start = init_match.start()
+    list_end = re.search(r"(\n\s*)(\]|\})\s*;", content[init_start:])
+    if not list_end:
+        print("[!] Could not find list closing for _coreInfo in CoreInfoManager.cs")
+        return
+
+    insert_pos = init_start + list_end.start()
+    snippets = []
+
     for core in cores:
         cid = core["id"]
         if f"ECoreType.{cid}" in content:
@@ -98,7 +111,7 @@ def patch_core_info_manager(file_path, cores):
         args = core.get("arguments", " {0}").replace('"', '\\"')
         abs_path = "true" if core.get("absolutePath", True) else "false"
 
-        core_info_snippet = f"""
+        snippet = f"""
                 new CoreInfo
                 {{
                     CoreType = ECoreType.{cid},
@@ -107,17 +120,11 @@ def patch_core_info_manager(file_path, cores):
                     Url = GetCoreUrl(ECoreType.{cid}),
                     AbsolutePath = {abs_path},
                 }},"""
+        snippets.append(snippet)
+        print(f"[+] Added CoreInfo definition for {cid} to CoreInfoManager.cs")
 
-        list_end_match = re.search(r"(\n\s*)(\]|\})\s*;", content)
-        if list_end_match:
-            insert_pos = list_end_match.start()
-            content = content[:insert_pos] + core_info_snippet + content[insert_pos:]
-            modified = True
-            print(f"[+] Added CoreInfo definition for {cid} to CoreInfoManager.cs")
-        else:
-            print(f"[!] Could not find list closing in CoreInfoManager.cs for {cid}")
-
-    if modified:
+    if snippets:
+        content = content[:insert_pos] + "".join(snippets) + content[insert_pos:]
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(content)
 
@@ -132,28 +139,20 @@ def patch_core_manager(file_path, cores):
     core_checks = " or ".join([f"ECoreType.{cid}" for cid in txt_cores])
     full_cond = f"(coreInfo.CoreType is ECoreType.brook or {core_checks} || configPath.EndsWith(\".txt\")) && System.IO.File.Exists(Utils.GetBinConfigPath(configPath)) ? System.IO.File.ReadAllText(Utils.GetBinConfigPath(configPath)).Trim() : (coreInfo.AbsolutePath ? Utils.GetBinConfigPath(configPath).AppendQuotes() : configPath)"
 
-    pattern = r"arguments:\s*string\.Format\(coreInfo\.Arguments,\s*([^)]+)\)"
-    
-    if "System.IO.File.ReadAllText" in content:
-        pattern_existing = r"arguments:\s*string\.Format\(coreInfo\.Arguments,\s*\(coreInfo\.CoreType is [^?]+\?[^:]+:[^)]+\)\)"
-        m = re.search(pattern_existing, content)
-        if m:
-            replacement = f"arguments: string.Format(coreInfo.Arguments, {full_cond})"
-            content = content[:m.start()] + replacement + content[m.end():]
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.write(content)
-            print("[+] Updated CoreManager.cs CLI arguments handler")
-            return
+    # Match the entire arguments: line in RunProcessNormal
+    new_content, count = re.subn(
+        r"arguments:\s*string\.Format\(coreInfo\.Arguments,[^\n]+\),",
+        f"arguments: string.Format(coreInfo.Arguments, {full_cond}),",
+        content,
+        count=1
+    )
 
-    m = re.search(pattern, content)
-    if m:
-        replacement = f"arguments: string.Format(coreInfo.Arguments, {full_cond})"
-        content = content[:m.start()] + replacement + content[m.end():]
+    if count > 0:
         with open(file_path, "w", encoding="utf-8") as f:
-            f.write(content)
+            f.write(new_content)
         print("[+] Patched CoreManager.cs CLI arguments handler")
     else:
-        print("[-] CoreManager.cs arguments pattern not matched (may already be patched or different structure)")
+        print("[-] CoreManager.cs arguments pattern not matched (may already be patched)")
 
 def main():
     root_dir = sys.argv[1] if len(sys.argv) > 1 else "."
