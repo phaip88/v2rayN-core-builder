@@ -173,7 +173,7 @@ def patch_speedtest_outbounds(root_dir):
                             serversItem = outbound.settings.servers.First();
                         }
                         serversItem.address = Global.Loopback;
-                        serversItem.port = _node.SocksPort > 0 ? _node.SocksPort : (_node.Port > 0 ? _node.Port : 10809);
+                        serversItem.port = _node.Port > 0 ? _node.Port : (_node.PreSocksPort ?? 10809);
                         serversItem.method = null;
                         serversItem.password = null;
                         outbound.protocol = "socks";
@@ -198,7 +198,7 @@ def patch_speedtest_outbounds(root_dir):
                     {
                         outbound.type = "socks";
                         outbound.server = Global.Loopback;
-                        outbound.server_port = _node.SocksPort > 0 ? _node.SocksPort : (_node.Port > 0 ? _node.Port : 10809);
+                        outbound.server_port = _node.Port > 0 ? _node.Port : (_node.PreSocksPort ?? 10809);
                         outbound.version = "5";
                         break;
                     }
