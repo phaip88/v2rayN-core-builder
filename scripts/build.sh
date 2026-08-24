@@ -36,7 +36,11 @@ echo "==> Working dir: $WORK"
 # ---- resolve version -------------------------------------------------------
 if [ "$VERSION" = "latest" ]; then
   echo "==> Resolving latest v2rayN release tag ..."
-  VERSION="$(curl -fsSL "https://api.github.com/repos/2dust/v2rayN/releases/latest" | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
+  VERSION="$(git ls-remote --tags https://github.com/2dust/v2rayN.git \
+      | awk -F'refs/tags/' '{print $2}' \
+      | grep -E '^[0-9]+(\.[0-9]+)*$' \
+      | sort -V | tail -1)"
+  [ -n "$VERSION" ] || { echo "!! could not resolve latest v2rayN tag"; exit 1; }
   echo "    -> $VERSION"
 fi
 
