@@ -1,0 +1,25 @@
+[
+  {
+    "_comment": "此文件只是抄写模板，构建时不会被读取！要启用内核请把条目复制到 cores.user.json。",
+
+    "_style_A": "参数内联型（gost/chisel/ssh/cloudflared/easytier 风格）：用户在 v2rayN 里粘贴的文本直接作为命令行参数传给内核",
+    "id": "mytunnel",
+    "enumValue": 37,
+    "repo": "owner/mytunnel",
+    "exes": ["mytunnel_windows_amd64", "mytunnel_linux_amd64", "mytunnel"],
+    "arguments": " {0}",
+    "absolutePath": true,
+    "txtArg": true
+  },
+  {
+    "_style_B": "配置文件型（sing-box '-c {0}' 风格）：用户填写的是配置文件内容，v2rayN 落盘后把路径传给内核；txtArg 必须为 false",
+    "id": "filecore",
+    "enumValue": 38,
+    "repo": "owner/filecore",
+    "exes": ["filecore"],
+    "arguments": "-c {0}",
+    "absolutePath": false,
+    "txtArg": false,
+    "environment": { "FILECORE_HOME": "{0}" }
+  }
+]

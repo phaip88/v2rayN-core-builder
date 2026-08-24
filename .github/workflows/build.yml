@@ -57,6 +57,11 @@ jobs:
             patch -p1 --fuzz=3 --batch --forward < ../patches/v2rayN-extended-cores.patch
           fi
 
+      - name: Apply custom cores from cores.user.json
+        shell: bash
+        run: |
+          python scripts/add_custom_cores.py cores.user.json v2rayN-src
+
       - name: Build ServiceLib.dll
         shell: bash
         run: |

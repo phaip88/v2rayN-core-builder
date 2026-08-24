@@ -55,6 +55,13 @@ else
   patch -p1 --fuzz=3 --batch --forward < "$PATCH"
 fi
 
+# ---- inject user-declared custom cores --------------------------------------
+USER_CORES="$ROOT/cores.user.json"
+if [ -f "$USER_CORES" ]; then
+  echo "==> Injecting custom cores from cores.user.json ..."
+  python3 "$ROOT/scripts/add_custom_cores.py" "$USER_CORES" "$WORK/v2rayN-src"
+fi
+
 # ---- build ServiceLib.dll --------------------------------------------------
 echo "==> Building ServiceLib.dll (Release) ..."
 dotnet build v2rayN/ServiceLib/ServiceLib.csproj -c Release -o "$WORK/dist/ServiceLib"
