@@ -1,1 +1,0 @@
-﻿-L auto://:10809 -F relay+wss://gpuser:gppass@freedns.koalas.kdns.fr:443 -F http://zhang:zhangm88@freedns.koalas.kdns.fr:443

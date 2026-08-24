@@ -1,29 +1,16 @@
-﻿name: Build v2rayN with Extended Cores
+name: Build v2rayN with Extended Cores
 
 on:
   workflow_dispatch:
     inputs:
-      v2rayn_version:
-        description: "v2rayN Target Version / Tag (e.g. 7.24.4, 7.14.12, or latest)"
+      version:
+        description: 'v2rayN version tag (e.g. 7.24.4) or "latest"'
         required: true
-        default: "latest"
-      build_full_app:
-        description: "Build full v2rayN-Extended package in addition to ServiceLib.dll"
-        type: boolean
-        required: true
-        default: true
-      self_contained:
-        description: "Self-contained build (embed .NET 8 Runtime, zero dependencies)"
-        type: boolean
-        required: true
-        default: true
-  push:
-    branches:
-      - main
-    paths:
-      - "cores.json"
-      - "scripts/**"
-      - ".github/workflows/build.yml"
+        default: 'latest'
+      create_release:
+        description: 'Publish artifacts as a GitHub Release'
+        required: false
+        default: 'false'
 
 permissions:
   contents: write
@@ -31,105 +18,79 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
-      - name: Checkout Repository
+      - name: Checkout builder repo
         uses: actions/checkout@v4
 
-      - name: Setup .NET SDK
+      - name: Setup .NET 8 SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: '8.0.x'
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Determine Target v2rayN Version
-        id: get_version
-        shell: pwsh
+      - name: Resolve version
+        id: ver
+        shell: bash
         run: |
-          $reqVer = "${{ github.event.inputs.v2rayn_version }}"
-          if ([string]::IsNullOrWhiteSpace($reqVer) -or $reqVer -eq "latest") {
-            $latest = Invoke-RestMethod -Uri "https://api.github.com/repos/2dust/v2rayN/releases/latest"
-            $tag = $latest.tag_name
-          } else {
-            $tag = $reqVer
-          }
-          Write-Host "Target Tag: $tag"
-          echo "tag=$tag" >> $env:GITHUB_OUTPUT
+          if [ "${{ github.event.inputs.version }}" = "latest" ]; then
+            V=$(curl -fsSL "https://api.github.com/repos/2dust/v2rayN/releases/latest" | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
+          else
+            V="${{ github.event.inputs.version }}"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Resolved v2rayN version: $V"
 
-      - name: Clone Upstream v2rayN
-        shell: pwsh
+      - name: Clone v2rayN @ ${{ steps.ver.outputs.version }}
+        shell: bash
         run: |
-          $tag = "${{ steps.get_version.outputs.tag }}"
-          git clone --depth 1 --branch $tag https://github.com/2dust/v2rayN.git v2rayN-upstream
+          git clone --depth 1 --branch "${{ steps.ver.outputs.version }}" --filter=blob:none --sparse "https://github.com/2dust/v2rayN.git" v2rayN-src
+          cd v2rayN-src
+          git sparse-checkout set v2rayN
 
-      - name: Apply Custom Core Patches
+      - name: Apply extended-cores patch
+        shell: bash
         run: |
-          python scripts/patch_v2rayn.py ./v2rayN-upstream cores.json
+          cd v2rayN-src
+          if git apply --whitespace=nowarn ../patches/v2rayN-extended-cores.patch 2>/dev/null; then
+            echo "git apply: OK"
+          else
+            echo "git apply failed, retrying with patch (fuzz) ..."
+            patch -p1 --fuzz=3 --batch --forward < ../patches/v2rayN-extended-cores.patch
+          fi
 
       - name: Build ServiceLib.dll
-        shell: pwsh
+        shell: bash
         run: |
-          $csproj = Get-ChildItem -Path "./v2rayN-upstream" -Filter "ServiceLib.csproj" -Recurse | Select-Object -First 1
-          if (-not $csproj) {
-            Write-Error "ServiceLib.csproj not found!"
-            exit 1
-          }
-          dotnet build $csproj.FullName -c Release -o ./dist/ServiceLib
+          dotnet build v2rayN-src/v2rayN/ServiceLib/ServiceLib.csproj -c Release -o dist/ServiceLib
 
-      - name: Build Full v2rayN App (Self-Contained with UI)
-        if: ${{ github.event_name == 'push' || github.event.inputs.build_full_app == 'true' }}
-        shell: pwsh
+      - name: Build full self-contained Windows client
+        shell: bash
         run: |
-          $v2raynCsproj = Get-ChildItem -Path "./v2rayN-upstream" -Filter "v2rayN.csproj" -Recurse | Where-Object { $_.DirectoryName -notlike "*Desktop*" } | Select-Object -First 1
-          if ($v2raynCsproj) {
-            # Self-contained build includes the .NET 8 Desktop Runtime inside the package
-            dotnet publish $v2raynCsproj.FullName -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o ./dist/v2rayN-Extended
-          }
+          dotnet publish v2rayN-src/v2rayN/v2rayN/v2rayN.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o dist/v2rayN-Extended
 
-      - name: Package Artifacts
-        shell: pwsh
+      - name: Package artifacts
+        shell: bash
         run: |
-          New-Item -ItemType Directory -Path "./artifacts" -Force
-          $tag = "${{ steps.get_version.outputs.tag }}"
-          
-          # Compress ServiceLib patch package
-          Compress-Archive -Path "./dist/ServiceLib/*" -DestinationPath "./artifacts/ServiceLib-$tag.zip" -Force
-          
-          # Include templates in full package
-          if (Test-Path "./dist/v2rayN-Extended") {
-            Copy-Item -Recurse -Path "./templates" -Destination "./dist/v2rayN-Extended/custom_templates" -Force
-            Compress-Archive -Path "./dist/v2rayN-Extended/*" -DestinationPath "./artifacts/v2rayN-Extended-win64-SelfContained-$tag.zip" -Force
-          }
+          cd dist
+          7z a -r "../ServiceLib-extended-${{ steps.ver.outputs.version }}.zip" ServiceLib
+          7z a -r "../v2rayN-Extended-win64-SelfContained-${{ steps.ver.outputs.version }}.zip" v2rayN-Extended
+          cd ..
 
-      - name: Upload Build Artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: v2rayN-Extended-Builds-${{ steps.get_version.outputs.tag }}
-          path: ./artifacts/*
+          name: v2rayN-extended-${{ steps.ver.outputs.version }}
+          path: |
+            ServiceLib-extended-${{ steps.ver.outputs.version }}.zip
+            v2rayN-Extended-win64-SelfContained-${{ steps.ver.outputs.version }}.zip
 
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+      - name: Create release
+        if: ${{ github.event.inputs.create_release == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.get_version.outputs.tag }}-extended
-          name: "v2rayN Extended ${{ steps.get_version.outputs.tag }}"
-          body: |
-            ## v2rayN Extended Release (${{ steps.get_version.outputs.tag }})
-            
-            基于官方 `2dust/v2rayN` **${{ steps.get_version.outputs.tag }}** 编译，包含扩展内核支持：
-            - **Cloudflare Tunnel (`cloudflared`)**
-            - **EasyTier P2P Mesh (`easytier`)**
-            - **GOST Multi-protocol Tunnel (`gost`)**
-            - **Chisel Tunnel (`chisel`)**
-            - **OpenSSH Dynamic SOCKS (`ssh`)**
-            
-            ### 资产说明
-            1. **`ServiceLib-${{ steps.get_version.outputs.tag }}.zip`**：轻量类库补丁，覆盖现有客户端。
-            2. **`v2rayN-Extended-win64-SelfContained-${{ steps.get_version.outputs.tag }}.zip`**：内置 .NET 8 运行时的完整图形界面客户端，免装任何运行库，开箱即用。
-          files: ./artifacts/*
+          tag_name: v2rayN-extended-${{ steps.ver.outputs.version }}
+          name: v2rayN Extended ${{ steps.ver.outputs.version }}
+          files: |
+            ServiceLib-extended-${{ steps.ver.outputs.version }}.zip
+            v2rayN-Extended-win64-SelfContained-${{ steps.ver.outputs.version }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

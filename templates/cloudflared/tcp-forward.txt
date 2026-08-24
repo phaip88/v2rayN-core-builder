@@ -1,1 +1,0 @@
-﻿access tcp --hostname your-ssh-or-vless.example.com --url 127.0.0.1:10808

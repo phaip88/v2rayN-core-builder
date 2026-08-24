@@ -1,0 +1,100 @@
+--- a/v2rayN/ServiceLib/Enums/ECoreType.cs
++++ b/v2rayN/ServiceLib/Enums/ECoreType.cs
+@@ -16,5 +16,11 @@
+     overtls = 28,
+     shadowquic = 29,
+     mieru = 30,
++    gost = 31,
++    chisel = 32,
++    ssh = 33,
++    sshpass = 34,
++    easytier = 35,
++    cloudflared = 36,
+     v2rayN = 99
+ }
+--- a/v2rayN/ServiceLib/Global.cs
++++ b/v2rayN/ServiceLib/Global.cs
+@@ -645,6 +645,12 @@
+         { ECoreType.overtls, "ShadowsocksR-Live/overtls" },
+         { ECoreType.shadowquic, "spongebob888/shadowquic" },
+         { ECoreType.mieru, "enfein/mieru" },
++            { ECoreType.gost, "go-gost/gost" },
++            { ECoreType.chisel, "jpillora/chisel" },
++            { ECoreType.ssh, "PowerShell/Win32-OpenSSH" },
++            { ECoreType.sshpass, "xhcoding/sshpass-win32" },
++            { ECoreType.easytier, "EasyTier/EasyTier" },
++            { ECoreType.cloudflared, "cloudflare/cloudflared" },
+         { ECoreType.v2rayN, "2dust/v2rayN" },
+     };
+ 
+--- a/v2rayN/ServiceLib/Manager/CoreInfoManager.cs
++++ b/v2rayN/ServiceLib/Manager/CoreInfoManager.cs
+@@ -288,7 +288,56 @@
+                         { "MIERU_CONFIG_JSON_FILE", "{0}" },
+                     },
+                 },
+-        ];
++        
++                new CoreInfo
++                {
++                    CoreType = ECoreType.gost,
++                    CoreExes = ["gost_windows_amd64", "gost_linux_amd64", "gost"],
++                    Arguments = " {0}",
++                    Url = GetCoreUrl(ECoreType.gost),
++                    AbsolutePath = true,
++                },
++                new CoreInfo
++                {
++                    CoreType = ECoreType.chisel,
++                    CoreExes = ["chisel_windows_amd64", "chisel_linux_amd64", "chisel"],
++                    Arguments = " {0}",
++                    Url = GetCoreUrl(ECoreType.chisel),
++                    AbsolutePath = true,
++                },
++                new CoreInfo
++                {
++                    CoreType = ECoreType.ssh,
++                    CoreExes = ["ssh_windows_amd64", "ssh_linux_amd64", "ssh"],
++                    Arguments = " {0}",
++                    Url = GetCoreUrl(ECoreType.ssh),
++                    AbsolutePath = true,
++                },
++                new CoreInfo
++                {
++                    CoreType = ECoreType.sshpass,
++                    CoreExes = ["sshpass_windows_amd64", "sshpass_linux_amd64", "sshpass"],
++                    Arguments = " {0}",
++                    Url = GetCoreUrl(ECoreType.sshpass),
++                    AbsolutePath = true,
++                },
++                new CoreInfo
++                {
++                    CoreType = ECoreType.easytier,
++                    CoreExes = ["easytier-core_windows_amd64", "easytier-core_linux_amd64", "easytier-core"],
++                    Arguments = " {0}",
++                    Url = GetCoreUrl(ECoreType.easytier),
++                    AbsolutePath = true,
++                },
++                new CoreInfo
++                {
++                    CoreType = ECoreType.cloudflared,
++                    CoreExes = ["cloudflared_windows_amd64", "cloudflared_linux_amd64", "cloudflared"],
++                    Arguments = " {0}",
++                    Url = GetCoreUrl(ECoreType.cloudflared),
++                    AbsolutePath = true,
++                },
++];
+     }
+ 
+     private static string PortableMode()
+--- a/v2rayN/ServiceLib/Manager/CoreManager.cs
++++ b/v2rayN/ServiceLib/Manager/CoreManager.cs
+@@ -341,7 +341,7 @@
+ 
+         var procService = new ProcessService(
+             fileName: fileName,
+-            arguments: string.Format(coreInfo.Arguments, coreInfo.AbsolutePath ? Utils.GetBinConfigPath(configPath).AppendQuotes() : configPath),
++            arguments: string.Format(coreInfo.Arguments, (coreInfo.CoreType is ECoreType.brook or ECoreType.gost or ECoreType.chisel or ECoreType.ssh or ECoreType.sshpass or ECoreType.easytier or ECoreType.cloudflared) ? System.IO.File.ReadAllText(Utils.GetBinConfigPath(configPath)) : (coreInfo.AbsolutePath ? Utils.GetBinConfigPath(configPath).AppendQuotes() : configPath)),
+             workingDirectory: Utils.GetBinConfigPath(),
+             displayLog: displayLog,
+             redirectInput: false,

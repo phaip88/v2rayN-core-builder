@@ -1,77 +1,62 @@
-﻿[
-  {
-    "id": "easytier",
-    "name": "EasyTier",
-    "enumValue": 35,
-    "repo": "EasyTier/EasyTier",
-    "exes": [
-      "easytier-core_windows_amd64",
-      "easytier-core_linux_amd64",
-      "easytier-core"
-    ],
-    "arguments": " {0}",
-    "isTxtConfig": true,
-    "absolutePath": true,
-    "description": "EasyTier decentralized P2P mesh VPN"
-  },
-  {
-    "id": "cloudflared",
-    "name": "Cloudflare Tunnel",
-    "enumValue": 36,
-    "repo": "cloudflare/cloudflared",
-    "exes": [
-      "cloudflared_windows_amd64",
-      "cloudflared_linux_amd64",
-      "cloudflared"
-    ],
-    "arguments": " {0}",
-    "isTxtConfig": true,
-    "absolutePath": true,
-    "description": "Cloudflare Tunnel CLI client for TCP/SOCKS proxy"
-  },
+[
   {
     "id": "gost",
+    "enumValue": 31,
     "name": "GOST",
-    "enumValue": 37,
     "repo": "go-gost/gost",
-    "exes": [
-      "gost_windows_amd64",
-      "gost_linux_amd64",
-      "gost"
-    ],
-    "arguments": " {0}",
-    "isTxtConfig": true,
-    "absolutePath": true,
-    "description": "GO Simple Tunnel - multi-protocol tunnel & proxy"
+    "binNames": ["gost_windows_amd64.exe", "gost_windows_amd64", "gost_linux_amd64", "gost"],
+    "binDir": "bin/gost/",
+    "config": "CLI arguments text (passed inline as the core argument)",
+    "note": "Multi-protocol tunnel & proxy. Config text = full gost args, e.g. `-L tcp://:10809 -F relay+wss://user:pass@host:443`"
   },
   {
     "id": "chisel",
+    "enumValue": 32,
     "name": "Chisel",
-    "enumValue": 38,
     "repo": "jpillora/chisel",
-    "exes": [
-      "chisel_windows_amd64",
-      "chisel_linux_amd64",
-      "chisel"
-    ],
-    "arguments": " {0}",
-    "isTxtConfig": true,
-    "absolutePath": true,
-    "description": "Fast TCP/UDP tunnel over HTTP"
+    "binNames": ["chisel_windows_amd64.exe", "chisel_windows_amd64", "chisel_linux_amd64", "chisel"],
+    "binDir": "bin/chisel/",
+    "config": "CLI arguments text",
+    "note": "TCP/UDP tunnel over HTTP/WS. e.g. `client --keepalive 25s https://host:8080 socks:127.0.0.1:10808`"
   },
   {
     "id": "ssh",
+    "enumValue": 33,
     "name": "OpenSSH",
-    "enumValue": 39,
     "repo": "PowerShell/Win32-OpenSSH",
-    "exes": [
-      "ssh_windows_amd64",
-      "ssh_linux_amd64",
-      "ssh"
-    ],
-    "arguments": " {0}",
-    "isTxtConfig": true,
-    "absolutePath": true,
-    "description": "SSH dynamic SOCKS forwarding client"
+    "binNames": ["ssh_windows_amd64.exe", "ssh_windows_amd64", "ssh_linux_amd64", "ssh"],
+    "binDir": "bin/ssh/",
+    "config": "CLI arguments text",
+    "note": "Dynamic SOCKS5 via SSH. e.g. `-N -D 127.0.0.1:10808 -p 22 user@host`"
+  },
+  {
+    "id": "sshpass",
+    "enumValue": 34,
+    "name": "sshpass",
+    "repo": "xhcoding/sshpass-win32",
+    "binNames": ["sshpass_windows_amd64.exe", "sshpass_windows_amd64", "sshpass_linux_amd64", "sshpass"],
+    "binDir": "bin/sshpass/",
+    "config": "CLI arguments text",
+    "note": "sshpass wrapper for password auth, e.g. `sshpass -p PASS ssh -N -D 127.0.0.1:10808 user@host`"
+  },
+  {
+    "id": "easytier",
+    "enumValue": 35,
+    "name": "EasyTier",
+    "repo": "EasyTier/EasyTier",
+    "binNames": ["easytier-core_windows_amd64.exe", "easytier-core_windows_amd64", "easytier-core_linux_amd64", "easytier-core"],
+    "binDir": "bin/easytier/",
+    "config": "CLI arguments text",
+    "note": "P2P virtual LAN mesh. e.g. `-i 10.144.144.2 --peers tcp://host:11010 -n net -p pw`"
+  },
+  {
+    "id": "cloudflared",
+    "enumValue": 36,
+    "name": "Cloudflare Tunnel",
+    "repo": "cloudflare/cloudflared",
+    "binNames": ["cloudflared_windows_amd64.exe", "cloudflared_windows_amd64", "cloudflared_linux_amd64", "cloudflared"],
+    "binDir": "bin/cloudflared/",
+    "config": "CLI arguments text",
+    "note": "Cloudflare Tunnel client. e.g. `access socks5 --hostname t.yourdomain.com --url 127.0.0.1:10808`"
   }
 ]

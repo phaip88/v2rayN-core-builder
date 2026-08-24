@@ -1,1 +1,0 @@
-﻿-i 10.144.144.2 --peers tcp://public.easytier.top:11010 -n my_network -p my_password
